@@ -7,7 +7,7 @@ import razorpay from "razorpay";
 import crypto from "crypto";
 
 // global variables
-const currency = 'inr'
+const currency = 'usd'
 const deliveryCharge = 10
 
 // GATEWAY INTIALIZE
