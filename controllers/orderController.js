@@ -8,7 +8,7 @@ import crypto from "crypto";
 
 // global variables
 const currency = 'usd'
-const deliveryCharge = 10
+const deliveryCharge = 35
 
 // GATEWAY INTIALIZE
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)

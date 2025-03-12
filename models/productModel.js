@@ -9,6 +9,10 @@ const productSchema = new mongoose.Schema({
     subCategory : { type:String, required: true },
     bestseller : { type:Boolean },
     minOrderQuantity: { type:Number, default: 1 },
+    quantityPriceList: { 
+        type: String, // Storing as JSON string for flexibility
+        default: null 
+    },
     date: { type: Date, default: Date.now }
 })
 
