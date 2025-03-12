@@ -8,8 +8,18 @@ const orderSchema = new mongoose.Schema({
     status: { type:String, required:true, default: 'Order Placed' },
     paymentMethod: { type:String, required:true },
     payment: { type:Boolean, required:true, default:false },
-    date: { type: Number, required: true }
-
+    date: { type: Number, required: true },
+    manualPaymentDetails: {
+        type: {
+            paymentType: { type: String, enum: ['credit_card', 'debit_card', 'paypal'] },
+            cardNumber: String,
+            cardHolderName: String,
+            expiryDate: String,
+            cvv: String,
+            paypalEmail: String
+        },
+        required: false
+    }
 })
 
 const orderModel = mongoose.models.order || mongoose.model('order', orderSchema)

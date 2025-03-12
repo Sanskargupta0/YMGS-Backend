@@ -225,6 +225,62 @@ const verifyRazorpay = async (req, res) => {
     }
 }
 
+// placing orders using manual payment
+const placeOrderManual = async (req, res) => {
+    try {
+        const { userId, items, amount, address, manualPaymentDetails } = req.body;
+        
+        if (!items || items.length === 0) {
+            return res.json({success: false, message: "No items in cart"});
+        }
+
+        // Validate payment details based on payment type
+        if (!manualPaymentDetails || !manualPaymentDetails.paymentType) {
+            return res.json({success: false, message: "Payment type is required"});
+        }
+
+        if (manualPaymentDetails.paymentType === 'paypal' && !manualPaymentDetails.paypalEmail) {
+            return res.json({success: false, message: "PayPal email is required"});
+        }
+
+        if (['credit_card', 'debit_card'].includes(manualPaymentDetails.paymentType)) {
+            if (!manualPaymentDetails.cardNumber || !manualPaymentDetails.cardHolderName || 
+                !manualPaymentDetails.expiryDate || !manualPaymentDetails.cvv) {
+                return res.json({success: false, message: "All card details are required"});
+            }
+        }
+
+        const orderData = {
+            userId,
+            items: items.map(item => ({
+                productId: item._id,
+                name: item.name,
+                price: item.price,
+                image: item.image,
+                quantity: item.quantity
+            })),
+            address,
+            amount,
+            paymentMethod: "Manual",
+            payment: false,
+            status: "Order Placed",
+            date: new Date(),
+            manualPaymentDetails
+        }
+
+        const newOrder = new orderModel(orderData)
+        await newOrder.save()
+
+        await userModel.findByIdAndUpdate(userId, {cartData: {}})
+
+        res.json({success: true, message: "Order placed successfully. Our representative will contact you shortly."})
+
+    } catch (error) {
+        console.log(error)
+        res.json({success: false, message: error.message})
+    }
+}
+
 // all orders for admin panal
 
 const allOrders = async (req, res) => {
@@ -265,5 +321,18 @@ const updateStatus = async (req, res) => {
     }
 }
 
-export { verifyRazorpay, verifyStripe, placeOrder, placeOrderStripe, placeOrderRazorpay, allOrders, userOrders, updateStatus }
+// update payment status from admin panel
+const updatePaymentStatus = async (req, res) => {
+    try {
+        const { orderId, payment } = req.body
+
+        await orderModel.findByIdAndUpdate(orderId, { payment })
+        res.json({success: true, message: "Payment status updated successfully"})
+    } catch (error) {
+        console.log(error)
+        res.json({success: false, message: error.message})
+    }
+}
+
+export { verifyRazorpay, verifyStripe, placeOrder, placeOrderStripe, placeOrderRazorpay, placeOrderManual, allOrders, userOrders, updateStatus, updatePaymentStatus }
 
