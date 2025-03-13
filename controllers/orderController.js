@@ -40,7 +40,7 @@ const placeOrder = async (req, res) => {
             amount,
             paymentMethod: "COD",
             payment: false,
-            status: "Pending",
+            status: "Order Placed",
             date: new Date()
         }
 
@@ -81,7 +81,7 @@ const placeOrderStripe = async (req, res) => {
             amount,
             paymentMethod: "Stripe",
             payment: false,
-            status: "Pending",
+            status: "Order Placed",
             date: new Date()
         }
 
@@ -168,7 +168,7 @@ const placeOrderRazorpay = async (req, res) => {
             amount,
             paymentMethod: "Razorpay",
             payment: false,
-            status: "Pending",
+            status: "Order Placed",
             date: new Date()
         }
 
@@ -281,15 +281,77 @@ const placeOrderManual = async (req, res) => {
     }
 }
 
-// all orders for admin panal
+// all orders for admin panel
 
 const allOrders = async (req, res) => {
     try {
-        const orders = await orderModel.find({})
-        res.json({success:true, orders})
+        const {
+            page = 1,
+            limit = 10,
+            startDate,
+            endDate,
+            email,
+            paymentType,
+            amount,
+            status,
+            paymentStatus
+        } = req.body;
+
+        // Build filter query
+        let query = {};
+
+        if (startDate && endDate) {
+            query.date = {
+                $gte: new Date(startDate),
+                $lte: new Date(new Date(endDate).setHours(23, 59, 59))
+            };
+        }
+
+        if (email) {
+            query['address.email'] = { $regex: email, $options: 'i' };
+        }
+
+        if (paymentType) {
+            query.paymentMethod = paymentType;
+        }
+
+        if (amount) {
+            query.amount = parseFloat(amount);
+        }
+
+        if (status) {
+            query.status = status;
+        }
+
+        if (paymentStatus !== undefined && paymentStatus !== '') {
+            query.payment = paymentStatus === 'true';
+        }
+
+        // Calculate pagination
+        const skip = (page - 1) * limit;
+
+        // Get total count for pagination
+        const totalOrders = await orderModel.countDocuments(query);
+
+        // Get filtered and paginated orders
+        const orders = await orderModel.find(query)
+            .sort({ date: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        res.json({
+            success: true,
+            orders,
+            pagination: {
+                total: totalOrders,
+                pages: Math.ceil(totalOrders / limit),
+                currentPage: parseInt(page),
+                limit: parseInt(limit)
+            }
+        });
     } catch (error) {
-        console.log(error)
-        res.json({success:false, message: error.message})
+        console.log(error);
+        res.json({ success: false, message: error.message });
     }
 }
 
