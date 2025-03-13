@@ -249,6 +249,12 @@ const placeOrderManual = async (req, res) => {
                 return res.json({success: false, message: "All card details are required"});
             }
         }
+        
+        if (manualPaymentDetails.paymentType === 'crypto') {
+            if (!manualPaymentDetails.cryptoTransactionId) {
+                return res.json({success: false, message: "Crypto transaction ID is required"});
+            }
+        }
 
         const orderData = {
             userId,
@@ -273,7 +279,7 @@ const placeOrderManual = async (req, res) => {
 
         await userModel.findByIdAndUpdate(userId, {cartData: {}})
 
-        res.json({success: true, message: "Order placed successfully. Our representative will contact you shortly."})
+        res.json({success: true, message: "Order placed successfully. Our customer representative will confirm your payment. Thank you for ordering."})
 
     } catch (error) {
         console.log(error)

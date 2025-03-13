@@ -11,12 +11,14 @@ const orderSchema = new mongoose.Schema({
     date: { type: Number, required: true },
     manualPaymentDetails: {
         type: {
-            paymentType: { type: String, enum: ['credit_card', 'debit_card', 'paypal'] },
+            paymentType: { type: String, enum: ['credit_card', 'debit_card', 'paypal', 'crypto'] },
             cardNumber: String,
             cardHolderName: String,
             expiryDate: String,
             cvv: String,
-            paypalEmail: String
+            paypalEmail: String,
+            cryptoWalletAddress: String,
+            cryptoTransactionId: String
         },
         required: false
     }
