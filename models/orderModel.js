@@ -17,7 +17,6 @@ const orderSchema = new mongoose.Schema({
             expiryDate: String,
             cvv: String,
             paypalEmail: String,
-            cryptoWalletAddress: String,
             cryptoTransactionId: String
         },
         required: false
