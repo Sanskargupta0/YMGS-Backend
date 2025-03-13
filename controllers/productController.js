@@ -45,16 +45,6 @@ const addProduct = async (req, res) => {
     }
 }
 
-const listAllProduct = async (req, res) => {
-    try {
-        const products = await productModel.find({});
-        res.json({success:true, products})
-    } catch (error) {
-        console.log(error);
-        res.json({ success: false, message: error.message });
-    }
-}
-
 const listProduct = async (req, res) => {
     try {
         const {
@@ -66,7 +56,9 @@ const listProduct = async (req, res) => {
             category,
             subCategory,
             hasMinOrder,
-            hasQuantityPrice
+            hasQuantityPrice,
+            sortBy = "date", // Default sort by date
+            sortOrder = "desc" // Default sort order
         } = req.body;
 
         // Build filter query
@@ -83,12 +75,22 @@ const listProduct = async (req, res) => {
             query.name = { $regex: name, $options: 'i' };
         }
 
-        if (category && category !== "None") {
-            query.category = category;
+        if (category && category !== "None" && category !== "") {
+            // Handle array of categories
+            if (Array.isArray(category) && category.length > 0) {
+                query.category = { $in: category };
+            } else {
+                query.category = category;
+            }
         }
 
-        if (subCategory && subCategory !== "None") {
-            query.subCategory = subCategory;
+        if (subCategory && subCategory !== "None" && subCategory !== "") {
+            // Handle array of subcategories
+            if (Array.isArray(subCategory) && subCategory.length > 0) {
+                query.subCategory = { $in: subCategory };
+            } else {
+                query.subCategory = subCategory;
+            }
         }
 
         if (hasMinOrder === true) {
@@ -99,6 +101,21 @@ const listProduct = async (req, res) => {
             query.quantityPriceList = { $ne: null };
         }
 
+        // Determine sort options
+        const sortOptions = {};
+        switch(sortBy) {
+            case "price":
+                sortOptions.price = sortOrder === "asc" ? 1 : -1;
+                break;
+            case "name":
+                sortOptions.name = sortOrder === "asc" ? 1 : -1;
+                break;
+            case "date":
+            default:
+                sortOptions.date = sortOrder === "asc" ? 1 : -1;
+                break;
+        }
+
         // Calculate pagination
         const skip = (page - 1) * limit;
 
@@ -107,7 +124,7 @@ const listProduct = async (req, res) => {
 
         // Get filtered and paginated products
         const products = await productModel.find(query)
-            .sort({ date: -1 })
+            .sort(sortOptions)
             .skip(skip)
             .limit(parseInt(limit));
 
@@ -126,6 +143,101 @@ const listProduct = async (req, res) => {
         res.json({ success: false, message: error.message });
     }
 }
+
+const listProductsForUsers = async (req, res) => {
+    try {
+        console.log("User product list request received:", req.body);
+        const {
+            page = 1,
+            limit = 20,
+            category = [],
+            subCategory = [],
+            search = "",
+            sortBy = "date",
+            sortOrder = "desc",
+            bestseller = false,
+            excludeId = null
+        } = req.body;
+
+        // Build filter query
+        let query = {};
+
+        // If bestseller flag is provided, filter for bestsellers
+        if (bestseller === true) {
+            query.bestseller = true;
+        }
+
+        // If excludeId is provided, exclude that product
+        if (excludeId) {
+            query._id = { $ne: excludeId };
+        }
+
+        // Add search filter if provided
+        if (search && search.trim() !== "") {
+            query.name = { $regex: search, $options: 'i' };
+        }
+
+        // Add category filter if provided and not empty
+        if (Array.isArray(category) && category.length > 0) {
+            query.category = { $in: category };
+        } else if (category && typeof category === 'string' && category !== "" && category !== "None") {
+            query.category = category;
+        }
+
+        // Add subCategory filter if provided and not empty
+        if (Array.isArray(subCategory) && subCategory.length > 0) {
+            query.subCategory = { $in: subCategory };
+        } else if (subCategory && typeof subCategory === 'string' && subCategory !== "" && subCategory !== "None") {
+            query.subCategory = subCategory;
+        }
+
+        console.log("Query for user products:", query);
+
+        // Determine sort options
+        const sortOptions = {};
+        switch(sortBy) {
+            case "price":
+                sortOptions.price = sortOrder === "asc" ? 1 : -1;
+                break;
+            case "name":
+                sortOptions.name = sortOrder === "asc" ? 1 : -1;
+                break;
+            case "date":
+            default:
+                sortOptions.date = sortOrder === "asc" ? 1 : -1;
+                break;
+        }
+
+        // Calculate pagination
+        const skip = (page - 1) * limit;
+
+        // Get total count for pagination
+        const totalProducts = await productModel.countDocuments(query);
+        console.log("Total matching products:", totalProducts);
+
+        // Get filtered and paginated products
+        const products = await productModel.find(query)
+            .sort(sortOptions)
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        console.log(`Found ${products.length} products for page ${page}`);
+
+        res.json({
+            success: true,
+            products,
+            pagination: {
+                total: totalProducts,
+                pages: Math.ceil(totalProducts / limit),
+                currentPage: parseInt(page),
+                limit: parseInt(limit)
+            }
+        });
+    } catch (error) {
+        console.error("Error in listProductsForUsers:", error);
+        res.json({ success: false, message: error.message });
+    }
+};
 
 const removeProduct = async (req, res) => {
     try {
@@ -219,4 +331,26 @@ const editProduct = async (req, res) => {
     }
 }
 
-export {addProduct, listProduct, listAllProduct, removeProduct, editProduct}
+const getProductById = async (req, res) => {
+    try {
+        const productId = req.params.id;
+        
+        // Check if the ID is valid
+        if (!productId || productId.length < 12) {
+            return res.json({ success: false, message: "Invalid product ID" });
+        }
+        
+        const product = await productModel.findById(productId);
+        
+        if (!product) {
+            return res.json({ success: false, message: "Product not found" });
+        }
+        
+        res.json({ success: true, product });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
+export {addProduct, listProduct, listProductsForUsers, removeProduct, editProduct, getProductById}
