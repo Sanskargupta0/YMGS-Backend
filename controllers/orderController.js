@@ -365,13 +365,46 @@ const allOrders = async (req, res) => {
 
 const userOrders = async (req, res) => {
     try {
-        const { userId } = req.body
-
-        const orders =  await orderModel.find({ userId })
-        res.json({success: true, orders})
+        const { userId, email, page = 1, limit = 5 } = req.body;
+        
+        // Calculate pagination
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        
+        let query = {};
+        
+        // If user is logged in, find by userId
+        if (userId) {
+            query.userId = userId;
+        } 
+        // If looking up by email (for non-logged-in users)
+        else if (email) {
+            query['address.email'] = email;
+        } else {
+            return res.json({ success: false, message: "User ID or email is required" });
+        }
+        
+        // Get total count for pagination
+        const totalOrders = await orderModel.countDocuments(query);
+        
+        // Get orders with pagination
+        const orders = await orderModel.find(query)
+            .sort({ date: -1 }) // Latest orders first
+            .skip(skip)
+            .limit(parseInt(limit));
+            
+        res.json({
+            success: true, 
+            orders,
+            pagination: {
+                total: totalOrders,
+                pages: Math.ceil(totalOrders / parseInt(limit)),
+                currentPage: parseInt(page),
+                limit: parseInt(limit)
+            }
+        });
     } catch (error) {
-        console.log(error)
-        res.json({success:false, message: error.message})
+        console.log(error);
+        res.json({success: false, message: error.message});
     }
 }
 
