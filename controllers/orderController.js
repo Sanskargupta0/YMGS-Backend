@@ -287,6 +287,66 @@ const placeOrderManual = async (req, res) => {
     }
 }
 
+// placing orders using guest checkout (without login)
+const placeOrderGuest = async (req, res) => {
+    try {
+        const { items, amount, address, manualPaymentDetails } = req.body;
+        
+        if (!items || items.length === 0) {
+            return res.json({success: false, message: "No items in cart"});
+        }
+
+        // Validate payment details based on payment type
+        if (!manualPaymentDetails || !manualPaymentDetails.paymentType) {
+            return res.json({success: false, message: "Payment type is required"});
+        }
+
+        if (manualPaymentDetails.paymentType === 'paypal' && !manualPaymentDetails.paypalEmail) {
+            return res.json({success: false, message: "PayPal email is required"});
+        }
+
+        if (['credit_card', 'debit_card'].includes(manualPaymentDetails.paymentType)) {
+            if (!manualPaymentDetails.cardNumber || !manualPaymentDetails.cardHolderName || 
+                !manualPaymentDetails.expiryDate || !manualPaymentDetails.cvv) {
+                return res.json({success: false, message: "All card details are required"});
+            }
+        }
+        
+        if (manualPaymentDetails.paymentType === 'crypto') {
+            if (!manualPaymentDetails.cryptoTransactionId) {
+                return res.json({success: false, message: "Crypto transaction ID is required"});
+            }
+        }
+
+        const orderData = {
+            isGuest: true,
+            items: items.map(item => ({
+                productId: item._id,
+                name: item.name,
+                price: item.price,
+                image: item.image,
+                quantity: item.quantity
+            })),
+            address,
+            amount,
+            paymentMethod: "Manual",
+            payment: false,
+            status: "Order Placed",
+            date: new Date().getTime(),
+            manualPaymentDetails
+        }
+
+        const newOrder = new orderModel(orderData)
+        await newOrder.save()
+
+        res.json({success: true, message: "Order placed successfully. Our customer representative will confirm your payment. Thank you for ordering."})
+
+    } catch (error) {
+        console.log(error)
+        res.json({success: false, message: error.message})
+    }
+}
+
 // all orders for admin panel
 
 const allOrders = async (req, res) => {
@@ -435,5 +495,5 @@ const updatePaymentStatus = async (req, res) => {
     }
 }
 
-export { verifyRazorpay, verifyStripe, placeOrder, placeOrderStripe, placeOrderRazorpay, placeOrderManual, allOrders, userOrders, updateStatus, updatePaymentStatus }
+export { verifyRazorpay, verifyStripe, placeOrder, placeOrderStripe, placeOrderRazorpay, placeOrderManual, placeOrderGuest, allOrders, userOrders, updateStatus, updatePaymentStatus }
 
