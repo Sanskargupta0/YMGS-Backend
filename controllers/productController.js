@@ -32,9 +32,6 @@ const addProduct = async (req, res) => {
             image: imagesUrl,
             date: Date.now()
         }
-
-        console.log(productData);
-
         const product = new productModel(productData);
         await product.save()
 
@@ -146,7 +143,6 @@ const listProduct = async (req, res) => {
 
 const listProductsForUsers = async (req, res) => {
     try {
-        console.log("User product list request received:", req.body);
         const {
             page = 1,
             limit = 20,
@@ -191,8 +187,6 @@ const listProductsForUsers = async (req, res) => {
             query.subCategory = subCategory;
         }
 
-        console.log("Query for user products:", query);
-
         // Determine sort options
         const sortOptions = {};
         switch(sortBy) {
@@ -213,15 +207,12 @@ const listProductsForUsers = async (req, res) => {
 
         // Get total count for pagination
         const totalProducts = await productModel.countDocuments(query);
-        console.log("Total matching products:", totalProducts);
 
         // Get filtered and paginated products
         const products = await productModel.find(query)
             .sort(sortOptions)
             .skip(skip)
             .limit(parseInt(limit));
-
-        console.log(`Found ${products.length} products for page ${page}`);
 
         res.json({
             success: true,

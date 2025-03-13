@@ -31,7 +31,7 @@ app.options('*', cors())
 
 //api-end points
 app.get("/", (req, res) => {
-    res.status(200).send("YMGS Backend");
+    res.status(200).send("YMGS pharmacy Backend");
   });
 app.use('/api/user', userRouter)
 app.use('/api/product', productRouter)
