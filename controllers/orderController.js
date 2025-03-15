@@ -1,5 +1,4 @@
 // placing orders using COD
-
 import orderModel from "../models/orderModel.js";
 import userModel from "../models/userModel.js";
 import Stripe from "stripe";
@@ -21,11 +20,14 @@ const razorpayInstance = new razorpay({
 
 const placeOrder = async (req, res) => {
     try {
-        const { userId, items, amount, address } = req.body;
+        const { userId, items, amount, address, billingAddress } = req.body;
         
         if (!items || items.length === 0) {
             return res.json({success: false, message: "No items in cart"});
         }
+
+        // If billingAddress is not provided, use delivery address
+        const finalBillingAddress = billingAddress || address;
 
         const orderData = {
             userId,
@@ -37,6 +39,7 @@ const placeOrder = async (req, res) => {
                 quantity: item.quantity
             })),
             address,
+            billingAddress: finalBillingAddress,
             amount,
             paymentMethod: "COD",
             payment: false,
@@ -61,12 +64,15 @@ const placeOrder = async (req, res) => {
 
 const placeOrderStripe = async (req, res) => {
     try {
-        const { userId, items, amount, address } = req.body;
+        const { userId, items, amount, address, billingAddress } = req.body;
         const { origin } = req.headers
 
         if (!items || items.length === 0) {
             return res.json({success: false, message: "No items in cart"});
         }
+
+        // If billingAddress is not provided, use delivery address
+        const finalBillingAddress = billingAddress || address;
 
         const orderData = {
             userId,
@@ -78,6 +84,7 @@ const placeOrderStripe = async (req, res) => {
                 quantity: item.quantity
             })),
             address,
+            billingAddress: finalBillingAddress,
             amount,
             paymentMethod: "Stripe",
             payment: false,
@@ -149,11 +156,14 @@ const verifyStripe = async (req, res) => {
 
 const placeOrderRazorpay = async (req, res) => {
     try {
-        const { userId, items, amount, address } = req.body;
+        const { userId, items, amount, address, billingAddress } = req.body;
 
         if (!items || items.length === 0) {
             return res.json({success: false, message: "No items in cart"});
         }
+
+        // If billingAddress is not provided, use delivery address
+        const finalBillingAddress = billingAddress || address;
 
         const orderData = {
             userId,
@@ -165,6 +175,7 @@ const placeOrderRazorpay = async (req, res) => {
                 quantity: item.quantity
             })),
             address,
+            billingAddress: finalBillingAddress,
             amount,
             paymentMethod: "Razorpay",
             payment: false,
@@ -228,7 +239,7 @@ const verifyRazorpay = async (req, res) => {
 // placing orders using manual payment
 const placeOrderManual = async (req, res) => {
     try {
-        const { userId, items, amount, address, manualPaymentDetails } = req.body;
+        const { userId, items, amount, address, billingAddress, manualPaymentDetails } = req.body;
         
         if (!items || items.length === 0) {
             return res.json({success: false, message: "No items in cart"});
@@ -250,11 +261,10 @@ const placeOrderManual = async (req, res) => {
             }
         }
         
-        if (manualPaymentDetails.paymentType === 'crypto') {
-            if (!manualPaymentDetails.cryptoTransactionId) {
-                return res.json({success: false, message: "Crypto transaction ID is required"});
-            }
-        }
+        // For crypto, transaction ID is optional based on the frontend implementation
+
+        // If billingAddress is not provided, use delivery address
+        const finalBillingAddress = billingAddress || address;
 
         const orderData = {
             userId,
@@ -266,6 +276,7 @@ const placeOrderManual = async (req, res) => {
                 quantity: item.quantity
             })),
             address,
+            billingAddress: finalBillingAddress,
             amount,
             paymentMethod: "Manual",
             payment: false,
@@ -290,7 +301,7 @@ const placeOrderManual = async (req, res) => {
 // placing orders using guest checkout (without login)
 const placeOrderGuest = async (req, res) => {
     try {
-        const { items, amount, address, manualPaymentDetails } = req.body;
+        const { items, amount, address, billingAddress, manualPaymentDetails } = req.body;
         
         if (!items || items.length === 0) {
             return res.json({success: false, message: "No items in cart"});
@@ -312,11 +323,10 @@ const placeOrderGuest = async (req, res) => {
             }
         }
         
-        if (manualPaymentDetails.paymentType === 'crypto') {
-            if (!manualPaymentDetails.cryptoTransactionId) {
-                return res.json({success: false, message: "Crypto transaction ID is required"});
-            }
-        }
+        // For crypto, transaction ID is optional based on the frontend implementation
+
+        // If billingAddress is not provided, use delivery address
+        const finalBillingAddress = billingAddress || address;
 
         const orderData = {
             isGuest: true,
@@ -328,11 +338,12 @@ const placeOrderGuest = async (req, res) => {
                 quantity: item.quantity
             })),
             address,
+            billingAddress: finalBillingAddress,
             amount,
             paymentMethod: "Manual",
             payment: false,
             status: "Order Placed",
-            date: new Date().getTime(),
+            date: new Date(),
             manualPaymentDetails
         }
 
