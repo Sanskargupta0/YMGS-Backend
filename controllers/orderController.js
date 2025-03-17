@@ -4,6 +4,9 @@ import userModel from "../models/userModel.js";
 import Stripe from "stripe";
 import razorpay from "razorpay";
 import crypto from "crypto";
+import couponModel from "../models/couponModel.js";
+import settingsModel from "../models/settingsModel.js";
+import cryptoWalletModel from "../models/cryptoWalletModel.js";
 
 // global variables
 const currency = 'usd'
@@ -20,7 +23,7 @@ const razorpayInstance = new razorpay({
 
 const placeOrder = async (req, res) => {
     try {
-        const { userId, items, amount, address, billingAddress } = req.body;
+        const { userId, items, amount, originalAmount, address, billingAddress, notes, couponCode } = req.body;
         
         if (!items || items.length === 0) {
             return res.json({success: false, message: "No items in cart"});
@@ -28,6 +31,26 @@ const placeOrder = async (req, res) => {
 
         // If billingAddress is not provided, use delivery address
         const finalBillingAddress = billingAddress || address;
+
+        // Apply coupon if provided
+        let finalAmount = amount;
+        let couponDetails = null;
+        
+        if (couponCode) {
+            const couponResult = await applyCoupon(couponCode, originalAmount - deliveryCharge);
+            if (couponResult.success) {
+                couponDetails = couponResult.couponDetails;
+                finalAmount = couponResult.finalAmount + deliveryCharge;
+                
+                // Increment the coupon usage count
+                await couponModel.findOneAndUpdate(
+                    { code: couponCode.toUpperCase() },
+                    { $inc: { usedCount: 1 } }
+                );
+            } else {
+                return res.json({ success: false, message: couponResult.message });
+            }
+        }
 
         const orderData = {
             userId,
@@ -40,11 +63,14 @@ const placeOrder = async (req, res) => {
             })),
             address,
             billingAddress: finalBillingAddress,
-            amount,
+            amount: finalAmount,
+            originalAmount: originalAmount,
             paymentMethod: "COD",
             payment: false,
             status: "Order Placed",
-            date: new Date()
+            date: new Date(),
+            notes: notes || "",
+            coupon: couponDetails
         }
 
         const newOrder = new orderModel(orderData)
@@ -239,7 +265,7 @@ const verifyRazorpay = async (req, res) => {
 // placing orders using manual payment
 const placeOrderManual = async (req, res) => {
     try {
-        const { userId, items, amount, address, billingAddress, manualPaymentDetails } = req.body;
+        const { userId, items, amount, originalAmount, address, billingAddress, manualPaymentDetails, notes, couponCode } = req.body;
         
         if (!items || items.length === 0) {
             return res.json({success: false, message: "No items in cart"});
@@ -266,6 +292,26 @@ const placeOrderManual = async (req, res) => {
         // If billingAddress is not provided, use delivery address
         const finalBillingAddress = billingAddress || address;
 
+        // Apply coupon if provided
+        let finalAmount = amount;
+        let couponDetails = null;
+        
+        if (couponCode) {
+            const couponResult = await applyCoupon(couponCode, originalAmount - deliveryCharge);
+            if (couponResult.success) {
+                couponDetails = couponResult.couponDetails;
+                finalAmount = couponResult.finalAmount + deliveryCharge;
+                
+                // Increment the coupon usage count
+                await couponModel.findOneAndUpdate(
+                    { code: couponCode.toUpperCase() },
+                    { $inc: { usedCount: 1 } }
+                );
+            } else {
+                return res.json({ success: false, message: couponResult.message });
+            }
+        }
+
         const orderData = {
             userId,
             items: items.map(item => ({
@@ -277,11 +323,14 @@ const placeOrderManual = async (req, res) => {
             })),
             address,
             billingAddress: finalBillingAddress,
-            amount,
+            amount: finalAmount,
+            originalAmount: originalAmount,
             paymentMethod: "Manual",
             payment: false,
             status: "Order Placed",
             date: new Date(),
+            notes: notes || "",
+            coupon: couponDetails,
             manualPaymentDetails
         }
 
@@ -301,7 +350,7 @@ const placeOrderManual = async (req, res) => {
 // placing orders using guest checkout (without login)
 const placeOrderGuest = async (req, res) => {
     try {
-        const { items, amount, address, billingAddress, manualPaymentDetails } = req.body;
+        const { items, amount, originalAmount, address, billingAddress, manualPaymentDetails, notes, couponCode } = req.body;
         
         if (!items || items.length === 0) {
             return res.json({success: false, message: "No items in cart"});
@@ -325,6 +374,26 @@ const placeOrderGuest = async (req, res) => {
         
         // For crypto, transaction ID is optional based on the frontend implementation
 
+        // Apply coupon if provided
+        let finalAmount = amount;
+        let couponDetails = null;
+        
+        if (couponCode) {
+            const couponResult = await applyCoupon(couponCode, originalAmount - deliveryCharge);
+            if (couponResult.success) {
+                couponDetails = couponResult.couponDetails;
+                finalAmount = couponResult.finalAmount + deliveryCharge;
+                
+                // Increment the coupon usage count
+                await couponModel.findOneAndUpdate(
+                    { code: couponCode.toUpperCase() },
+                    { $inc: { usedCount: 1 } }
+                );
+            } else {
+                return res.json({ success: false, message: couponResult.message });
+            }
+        }
+
         // If billingAddress is not provided, use delivery address
         const finalBillingAddress = billingAddress || address;
 
@@ -339,11 +408,14 @@ const placeOrderGuest = async (req, res) => {
             })),
             address,
             billingAddress: finalBillingAddress,
-            amount,
+            amount: finalAmount,
+            originalAmount: originalAmount,
             paymentMethod: "Manual",
             payment: false,
             status: "Order Placed",
             date: new Date(),
+            notes: notes || "",
+            coupon: couponDetails,
             manualPaymentDetails
         }
 
@@ -389,7 +461,7 @@ const allOrders = async (req, res) => {
         }
 
         if (paymentType) {
-            query.paymentMethod = paymentType;
+            query['manualPaymentDetails.paymentType'] = paymentType;
         }
 
         if (amount) {
@@ -506,5 +578,316 @@ const updatePaymentStatus = async (req, res) => {
     }
 }
 
-export { verifyRazorpay, verifyStripe, placeOrder, placeOrderStripe, placeOrderRazorpay, placeOrderManual, placeOrderGuest, allOrders, userOrders, updateStatus, updatePaymentStatus }
+// Add a function to apply coupon
+const applyCoupon = async (couponCode, amount) => {
+    try {
+        const coupon = await couponModel.findOne({ 
+            code: couponCode.toUpperCase(),
+            isActive: true,
+            $or: [
+                { endDate: null },
+                { endDate: { $gte: new Date() } }
+            ],
+            startDate: { $lte: new Date() }
+        });
+
+        if (!coupon) {
+            return { success: false, message: "Invalid or expired coupon code" };
+        }
+
+        if (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses) {
+            return { success: false, message: "Coupon usage limit reached" };
+        }
+
+        if (amount < coupon.minOrderValue) {
+            return { 
+                success: false, 
+                message: `Minimum order value of ${currency} ${coupon.minOrderValue} required for this coupon` 
+            };
+        }
+
+        let discountAmount = 0;
+        if (coupon.discountType === 'percentage') {
+            discountAmount = (amount * coupon.discountValue) / 100;
+        } else {
+            discountAmount = coupon.discountValue;
+        }
+
+        // Make sure discount doesn't exceed the order amount
+        discountAmount = Math.min(discountAmount, amount);
+        
+        const finalAmount = amount - discountAmount;
+
+        return { 
+            success: true, 
+            couponDetails: {
+                code: coupon.code,
+                discount: discountAmount,
+                discountType: coupon.discountType
+            },
+            finalAmount 
+        };
+    } catch (error) {
+        console.log(error);
+        return { success: false, message: error.message };
+    }
+}
+
+// Verify coupon endpoint
+const verifyCoupon = async (req, res) => {
+    try {
+        const { couponCode, amount } = req.body;
+        
+        if (!couponCode || !amount) {
+            return res.json({ success: false, message: "Coupon code and amount are required" });
+        }
+
+        const result = await applyCoupon(couponCode, amount);
+        res.json(result);
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+// Expose new function to update settings
+const getSettings = async (req, res) => {
+    try {
+        let settings = await settingsModel.findOne();
+        
+        if (!settings) {
+            // Create default settings if none exist
+            settings = await settingsModel.create({
+                contactEmail: 'ymgspharmacy@gmail.com',
+                contactPhone: '+91 8858284423',
+                contactAddress: '123 Fresh Market Lane, Garden District, Green City 12345',
+                businessHours: 'Mon - Sat: 8:00 AM - 8:00 PM\nSunday: 9:00 AM - 6:00 PM',
+                footerEmail: 'ymgspharmacy@gmail.com',
+                footerPhone: '+91 8858284423'
+            });
+        }
+        
+        res.json({ success: true, settings });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+const updateSettings = async (req, res) => {
+    try {
+        const { contactEmail, contactPhone, contactAddress, businessHours, footerEmail, footerPhone } = req.body;
+        
+        // Validate required fields
+        if (!contactEmail || !contactPhone || !contactAddress || !businessHours || !footerEmail || !footerPhone) {
+            return res.json({ success: false, message: "All fields are required" });
+        }
+        
+        let settings = await settingsModel.findOne();
+        
+        if (!settings) {
+            // Create new settings if none exist
+            settings = new settingsModel({
+                contactEmail,
+                contactPhone,
+                contactAddress,
+                businessHours,
+                footerEmail,
+                footerPhone
+            });
+        } else {
+            // Update existing settings
+            settings.contactEmail = contactEmail;
+            settings.contactPhone = contactPhone;
+            settings.contactAddress = contactAddress;
+            settings.businessHours = businessHours;
+            settings.footerEmail = footerEmail;
+            settings.footerPhone = footerPhone;
+            settings.updatedAt = new Date();
+        }
+        
+        await settings.save();
+        
+        res.json({ success: true, message: "Settings updated successfully", settings });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+// Crypto wallet management
+const getCryptoWallets = async (req, res) => {
+    try {
+        const wallets = await cryptoWalletModel.find({ isActive: true });
+        res.json({ success: true, wallets });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+const addCryptoWallet = async (req, res) => {
+    try {
+        const { cryptoType, network, walletAddress, qrCodeImage } = req.body;
+        
+        if (!cryptoType || !network || !walletAddress || !qrCodeImage) {
+            return res.json({ success: false, message: "All fields are required" });
+        }
+        
+        const newWallet = new cryptoWalletModel({
+            cryptoType,
+            network,
+            walletAddress,
+            qrCodeImage
+        });
+        
+        await newWallet.save();
+        
+        res.json({ success: true, message: "Crypto wallet added successfully", wallet: newWallet });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+const updateCryptoWallet = async (req, res) => {
+    try {
+        const { walletId, cryptoType, network, walletAddress, qrCodeImage, isActive } = req.body;
+        
+        if (!walletId) {
+            return res.json({ success: false, message: "Wallet ID is required" });
+        }
+        
+        const wallet = await cryptoWalletModel.findById(walletId);
+        
+        if (!wallet) {
+            return res.json({ success: false, message: "Wallet not found" });
+        }
+        
+        if (cryptoType) wallet.cryptoType = cryptoType;
+        if (network) wallet.network = network;
+        if (walletAddress) wallet.walletAddress = walletAddress;
+        if (qrCodeImage) wallet.qrCodeImage = qrCodeImage;
+        if (isActive !== undefined) wallet.isActive = isActive;
+        
+        await wallet.save();
+        
+        res.json({ success: true, message: "Wallet updated successfully", wallet });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+const deleteCryptoWallet = async (req, res) => {
+    try {
+        const { walletId } = req.body;
+        
+        if (!walletId) {
+            return res.json({ success: false, message: "Wallet ID is required" });
+        }
+        
+        await cryptoWalletModel.findByIdAndDelete(walletId);
+        
+        res.json({ success: true, message: "Wallet deleted successfully" });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+// Coupon management
+const getCoupons = async (req, res) => {
+    try {
+        const coupons = await couponModel.find().sort({ createdAt: -1 });
+        res.json({ success: true, coupons });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+const addCoupon = async (req, res) => {
+    try {
+        const { code, discountType, discountValue, minOrderValue, maxUses, startDate, endDate, isActive } = req.body;
+        
+        if (!code || !discountType || !discountValue) {
+            return res.json({ success: false, message: "Code, discount type and value are required" });
+        }
+        
+        // Check if coupon code already exists
+        const existingCoupon = await couponModel.findOne({ code: code.toUpperCase() });
+        if (existingCoupon) {
+            return res.json({ success: false, message: "Coupon code already exists" });
+        }
+        
+        const newCoupon = new couponModel({
+            code: code.toUpperCase(),
+            discountType,
+            discountValue,
+            minOrderValue: minOrderValue || 0,
+            maxUses,
+            startDate: startDate || new Date(),
+            endDate,
+            isActive: isActive !== undefined ? isActive : true
+        });
+        
+        await newCoupon.save();
+        
+        res.json({ success: true, message: "Coupon added successfully", coupon: newCoupon });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+const updateCoupon = async (req, res) => {
+    try {
+        const { couponId, discountType, discountValue, minOrderValue, maxUses, startDate, endDate, isActive } = req.body;
+        
+        if (!couponId) {
+            return res.json({ success: false, message: "Coupon ID is required" });
+        }
+        
+        const coupon = await couponModel.findById(couponId);
+        
+        if (!coupon) {
+            return res.json({ success: false, message: "Coupon not found" });
+        }
+        
+        if (discountType) coupon.discountType = discountType;
+        if (discountValue) coupon.discountValue = discountValue;
+        if (minOrderValue !== undefined) coupon.minOrderValue = minOrderValue;
+        if (maxUses !== undefined) coupon.maxUses = maxUses;
+        if (startDate) coupon.startDate = startDate;
+        if (endDate) coupon.endDate = endDate;
+        if (isActive !== undefined) coupon.isActive = isActive;
+        
+        await coupon.save();
+        
+        res.json({ success: true, message: "Coupon updated successfully", coupon });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+const deleteCoupon = async (req, res) => {
+    try {
+        const { couponId } = req.body;
+        
+        if (!couponId) {
+            return res.json({ success: false, message: "Coupon ID is required" });
+        }
+        
+        await couponModel.findByIdAndDelete(couponId);
+        
+        res.json({ success: true, message: "Coupon deleted successfully" });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+export { verifyRazorpay, verifyStripe, placeOrder, placeOrderStripe, placeOrderRazorpay, placeOrderManual, placeOrderGuest, allOrders, userOrders, updateStatus, updatePaymentStatus, verifyCoupon, getSettings, updateSettings, getCryptoWallets, addCryptoWallet, updateCryptoWallet, deleteCryptoWallet, getCoupons, addCoupon, updateCoupon, deleteCoupon }
 

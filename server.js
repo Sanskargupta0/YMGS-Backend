@@ -9,6 +9,7 @@ import cartRouter from './routes/cartRoute.js'
 import orderRouter from './routes/orderRoute.js'
 import addressRouter from './routes/addressRoute.js'
 import contactRouter from './routes/contactRoutes.js'
+import uploadImageRoute from './routes/uploadImageRoute.js'
 
 //App config
 const app = express()
@@ -39,6 +40,7 @@ app.use('/api/cart', cartRouter)
 app.use('/api/order', orderRouter)
 app.use('/api/address', addressRouter)
 app.use('/api/contact', contactRouter)
+app.use('/api/upload-image', uploadImageRoute)
 
 app.get('/', (req, res)=>{
     res.send("API Working")
