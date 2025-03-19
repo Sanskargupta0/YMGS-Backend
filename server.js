@@ -20,7 +20,12 @@ connectCloudinary()
 //middleware
 app.use(express.json())
 app.use(cors({
-    origin: [process.env.FRONTEND_URL, process.env.ADMIN_URL],
+    origin: [
+      process.env.FRONTEND_URL, 
+      process.env.ADMIN_URL,
+      "https://www.ymgspharmacy.com",
+      "https://www.admin.ymgspharmacy.com"
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'token'],
     exposedHeaders: ['Content-Type', 'Authorization', 'token'],
