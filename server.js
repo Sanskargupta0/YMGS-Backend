@@ -27,8 +27,14 @@ app.use(cors({
     credentials: true
 }))
 
-// Add preflight handler for all routes
-app.options('*', cors())
+// ✅ Global CORS Response Headers Middleware
+app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, token");
+    res.header("Access-Control-Allow-Credentials", "true");
+    next();
+  });
 
 //api-end points
 app.get("/", (req, res) => {
@@ -41,9 +47,5 @@ app.use('/api/order', orderRouter)
 app.use('/api/address', addressRouter)
 app.use('/api/contact', contactRouter)
 app.use('/api/upload-image', uploadImageRoute)
-
-app.get('/', (req, res)=>{
-    res.send("API Working")
-})
 
 app.listen(port, ()=> console.log('Server started on PORT : '+ port))
