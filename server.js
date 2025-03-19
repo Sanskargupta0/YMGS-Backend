@@ -21,7 +21,7 @@ connectCloudinary()
 app.use(express.json())
 app.use(cors({
     origin: [process.env.FRONTEND_URL, process.env.ADMIN_URL],
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'token'],
     exposedHeaders: ['Content-Type', 'Authorization', 'token'],
     credentials: true
