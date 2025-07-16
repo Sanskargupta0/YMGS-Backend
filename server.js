@@ -24,8 +24,8 @@ app.use(cors({
     origin: [
       process.env.FRONTEND_URL, 
       process.env.ADMIN_URL,
-      "https://www.ymgspharmacy.com",
-      "https://www.admin.ymgspharmacy.com"
+      "https://ymgs-admin.vercel.app",
+      "https://ymgs-frontend.vercel.app"
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'token'],
